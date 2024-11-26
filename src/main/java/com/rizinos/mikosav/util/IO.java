@@ -62,6 +62,7 @@ public class IO {
         try {
             return getcall(rawUrl);
         } catch (Exception e) {
+            Bukkit.getLogger().warning(e.toString());
             return "ERRINV";
         }
     }

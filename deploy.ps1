@@ -2,7 +2,7 @@
 
 $privateKeyPath = "C:\Users\elias.klassen\ssh_keys\win_pinix_root.ppk"
 $server = "root@rizinos.com"
-$remotePath = "/mnt/data/ileies/private/software/Minecraft/server/plugins"
+$remotePath = "/mnt/data/ileies/private/software/minecraft/server/plugins"
 
 # 3. Transfer new files to the server
 Write-Host "Uploading new files to the server..."

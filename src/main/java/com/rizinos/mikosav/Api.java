@@ -22,16 +22,18 @@ public class Api {
     // TODO: Check everywhere if the playerData is saved appropriately. (rewritten to players.replace)
     boolean online = true;
     String domain;
+    String apiAddress;
     String unavailable = "There was a problem with our Webservice. Please contact Ileies";
     Gson gson = new Gson();
 
     public Api(String domain) {
         this.domain = domain;
+        this.apiAddress = "http://api." + domain + "/mc/";
     }
 
     private String get(String endpoint) {
         if (!online) return null;
-        String res = IO.get("http://api." + domain + "/mc/" + endpoint);
+        String res = IO.get(apiAddress + endpoint);
         if (res.equals("ERRINV")) {
             online = false;
             Bukkit.getLogger().severe(unavailable);
@@ -41,7 +43,7 @@ public class Api {
 
     private String post(String endpoint, Object json) {
         if (!online) return null;
-        String res = IO.post("http://api." + domain + "/" + endpoint, gson.toJson(json));
+        String res = IO.post(apiAddress + endpoint, gson.toJson(json));
         if (res.equals("ERRINV")) {
             online = false;
             Bukkit.getLogger().severe(unavailable);
