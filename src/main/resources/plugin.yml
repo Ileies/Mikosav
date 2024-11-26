@@ -1,0 +1,159 @@
+name: Mikosav
+version: '${project.version}'
+main: com.rizinos.mikosav.Mikosav
+api-version: 1.16
+prefix: Mikosav
+load: STARTUP
+authors: [ Ileies ]
+description: An interface to RizinOS
+website: https://rizinos.com
+commands:
+  back:
+    description: TP to last death location
+    usage: /back
+  balance:
+    description: See the balance of a player
+    usage: /balance [player]
+  day:
+    description: Clear weather and time
+    usage: /day
+    permission: mikosav.command.day
+  delwarp:
+    description: Removes a warp point
+    usage: /delwarp <warp>
+    permission: mikosav.command.setwarp
+  ec:
+    description: Open your enderchest
+    usage: /ec
+  ench:
+    description: Enchant the item in your hand
+    usage: /ench
+    permission: mikosav.command.ench
+  fly:
+    description: Start flying
+    usage: /fly [username]
+    permission: mikosav.command.fly
+  flyspeed:
+    description: Change fly speed
+    usage: /flyspeed <1-10>
+    permission: mikosav.command.fly
+  giveperm:
+    description: Give a user a permission
+    usage: /giveperm <username> <permission>
+    permission: mikosav.command.perms
+  heal:
+    description: Fill health and hunger
+    usage: /heal [username]
+    permission: mikosav.command.heal
+  hideplayer:
+    description: Hides a player from another player
+    usage: /hideplayer <player> <target>
+    permission: mikosav.command.hide
+  home:
+    description: TP back to home location
+    usage: /home
+  ms:
+    description: Accesses the mikosav api
+    usage: /ms <action> [data]
+    permission: mikosav.command.ms
+  obtain:
+    description: Obtain diamonds for money
+    usage: /obtain <value>
+  pay:
+    description: Pay a player money
+    usage: /pay <player> <amount>
+  protect:
+    description: Protect a chest
+    usage: /protect [off]
+  removeperm:
+    description: Remove a users permission
+    usage: /removeperm <username> <permission>
+    permission: mikosav.command.perms
+  run:
+    description: Run a command
+    usage: /run <command>
+    permission: mikosav.command.run
+  sethome:
+    description: Set home location
+    usage: /sethome
+  sell:
+    description: Pay items for money
+    usage: /sell [value]
+  setwarp:
+    description: Set a new warp point
+    usage: /setwarp <warp>
+    permission: mikosav.command.setwarp
+  showplayer:
+    description: Makes a hidden player visible again
+    usage: /showplayer <player> <target>
+    permission: mikosav.command.hide
+  spawn:
+    description: TP to server spawn
+    usage: /spawn
+  speed:
+    description: Change a players speed
+    usage: /speed <amount>
+    permission: mikosav.command.speed
+  tpa:
+    description: Ask another player to tp to them
+    usage: /tpa <player>
+  tpaccept:
+    description: Accept a TP request
+    usage: /tpaccept
+  warp:
+    description: TP to a warp point
+    usage: /warp <warp>
+  worth:
+    description: Get the worth of the items in your hand
+    usage: /worth
+  wtp:
+    description: TP to another world
+    usage: /wtp [player] <world>
+    permission: mikosav.command.wtp
+permissions:
+  mikosav.command.day:
+    default: op
+  mikosav.command.ec:
+    default: op
+  mikosav.command.ench:
+    default: op
+  mikosav.command.fly:
+    default: op
+  mikosav.command.flyall:
+    default: op
+  mikosav.command.heal:
+    default: op
+  mikosav.command.healall:
+    default: op
+  mikosav.command.hide:
+    default: op
+  mikosav.command.ms:
+    default: op
+  mikosav.command.perms:
+    default: op
+  mikosav.command.run:
+    default: op
+  mikosav.command.setwarp:
+    default: op
+  mikosav.command.speed:
+    default: op
+  mikosav.command.speedall:
+    default: op
+  mikosav.command.wtp:
+    default: op
+  mikosav.command.wtpall:
+    default: op
+  mikosav.bypass.protect:
+    default: op
+  mikosav.bypass.worldchange:
+    default: op
+  mikosav.perm.warpsign:
+    default: op
+  mikosav.beta:
+    default: op
+  mikosav.admin:
+    default: op
+  mikosav.moderator:
+    default: op
+  mikosav.verified:
+    default: op
