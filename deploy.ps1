@@ -1,7 +1,7 @@
 # deploy.ps1
 
-$privateKeyPath = "C:\Users\elias.klassen\ssh_keys\win_pinix_root.ppk"
-$server = "root@rizinos.com"
+$privateKeyPath = "C:\Users\elias.klassen\ssh_keys\win_dunix_root.ppk"
+$server = "root@192.168.10.105"
 $remotePath = "/mnt/data/ileies/private/software/minecraft/server/plugins"
 
 # 3. Transfer new files to the server

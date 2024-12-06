@@ -61,7 +61,7 @@ public class Api {
         jsonObject.addProperty("version", version);
         Type type = new TypeToken<Map<String, Object>>() {
         }.getType();
-        String data = post("getConfig", jsonObject);
+        String data = post("start", jsonObject);
         if (!online) return null;
         Bukkit.getLogger().severe(data);
         return gson.fromJson(data, type);
