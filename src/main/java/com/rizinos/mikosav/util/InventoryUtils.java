@@ -132,7 +132,9 @@ public class InventoryUtils {
         List<ItemStack> items = new ArrayList<>();
         ItemStack newItemStack;
         for (ItemStack itemStack : contents)
-            if (itemStack != null) {
+            if (itemStack == null) {
+                items.add(null);
+            } else {
                 newItemStack = new ItemStack(itemStack.getType(), itemStack.getAmount());
                 ItemMeta meta = itemStack.getItemMeta();
                 if (meta != null) newItemStack.setItemMeta(meta);

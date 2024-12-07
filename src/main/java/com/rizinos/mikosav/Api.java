@@ -14,9 +14,11 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static com.rizinos.mikosav.util.InventoryUtils.itemsToJson;
 import static com.rizinos.mikosav.util.Utils.locationToString;
+import static com.rizinos.mikosav.util.Utils.stringToLocation;
 
 public class Api {
     // TODO: Check everywhere if the playerData is saved appropriately. (rewritten to players.replace)
@@ -57,13 +59,12 @@ public class Api {
 
     public Map<String, Object> getConfig(String version) {
         // TODO: This should download the latest version from the server
+        if (!online) return null;
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("version", version);
+        String data = post("start", jsonObject);
         Type type = new TypeToken<Map<String, Object>>() {
         }.getType();
-        String data = post("start", jsonObject);
-        if (!online) return null;
-        Bukkit.getLogger().severe(data);
         return gson.fromJson(data, type);
     }
 
@@ -78,7 +79,7 @@ public class Api {
         return gson.fromJson(data, Integer.class);
     }
 
-    public Map<String, Double> getCredit(List<String> uuidList) {
+    public List<Map<String, Object>> getCredit(List<String> uuidList) {
         JsonObject jsonObject = new JsonObject();
         JsonArray jsonArray = new JsonArray();
         for (String uuid : uuidList) {
@@ -87,7 +88,7 @@ public class Api {
         jsonObject.add("uuids", jsonArray);
 
         String response = post("getCredit", jsonObject);
-        Type type = new TypeToken<Map<String, Double>>() {
+        Type type = new TypeToken<List<Map<String, Object>>>() {
         }.getType();
 
         return gson.fromJson(response, type);
@@ -97,19 +98,26 @@ public class Api {
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("uuid", uuid);
         String data = post("getPlayerData", jsonObject);
-/*
-        username: data.user.username;
-        welcomeMessage: data.welcomeMessage;
-        permissions: data.permissions;
-        credit: data.user.credit;
-        home: data.homeLocation;
-        mutedUntil: data.mutedUntil;
-        bannedUntil: data.bannedUntil;
-        bannedReason: data.bannedReason;
-*/
 
-        // TODO: Add a custom deserializer for this
-        return gson.fromJson(data, PlayerData.class);
+        Type type = new TypeToken<Map<String, Object>>() {
+        }.getType();
+        Map<String, Object> playerData = gson.fromJson(data, type);
+
+        if (playerData == null) return null;
+
+        String username = (String) playerData.get("username");
+        Integer credit = ((Double) playerData.get("credit")).intValue();
+        Location home = stringToLocation((String) playerData.get("home"));
+        String welcomeMessage = (String) playerData.get("welcomeMessage");
+        List<?> permissionsObj = (List<?>) playerData.get("permissions");
+        if (permissionsObj == null) return null;
+        List<String> permissions = permissionsObj.stream()
+                .map(String.class::cast)
+                .collect(Collectors.toList());
+        String bannedReason = (String) playerData.get("bannedReason");
+        Long mutedUntil = (Long) playerData.get("mutedUntil");
+        Long bannedUntil = (Long) playerData.get("bannedUntil");
+        return new PlayerData(username, credit, home, welcomeMessage, permissions, bannedReason, mutedUntil, bannedUntil);
     }
 
     public boolean setHome(String uuid, Location location) {
@@ -137,12 +145,10 @@ public class Api {
 
     public void saveInventory(String uuid, String worldName, PlayerInventory inventory) {
         JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("worldName", worldName);
+        jsonObject.addProperty("world", worldName);
         jsonObject.addProperty("uuid", uuid);
-        //itemsToJson();
-        post("saveInventory/1", inventory);
-        post("saveInventory/2", itemsToJson(inventory.getContents()));
-        post("saveInventory/3", inventory.getContents());
+        jsonObject.addProperty("inventory", gson.toJson(itemsToJson(inventory.getContents())));
+        post("saveInventory", itemsToJson(inventory.getContents()));
     }
 
     public PlayerInventory loadInventory(String uuid, String worldName) {
@@ -176,12 +182,16 @@ public class Api {
         return Objects.equals(post("pay", jsonObject), "true");
     }
 
-    public String worldTp(String uuid, String from, String to) {
+    public Map<String, Object> worldTp(String uuid, String from, String to) {
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("uuid", uuid);
         jsonObject.addProperty("from", from);
         jsonObject.addProperty("to", to);
-        return post("worldTp", jsonObject);
+
+        String data = post("canTp", jsonObject);
+        Type type = new TypeToken<Map<String, Object>>() {
+        }.getType();
+        return gson.fromJson(data, type);
     }
 
     // TODO: Repair and use this:

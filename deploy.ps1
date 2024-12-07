@@ -11,8 +11,6 @@ scp -i $privateKeyPath -r ./target/mikosav-2.0.0.jar ${server}:$remotePath
 
 # 4. SSH into the server and restart the server
 Write-Host "Restarting the Minecraft server..."
-$pm2Commands = "systemctl restart mc-server"
-#pm2 restart pm2.config.cjs --update-env
-ssh -i $privateKeyPath $server $pm2Commands
+#ssh -i $privateKeyPath $server "systemctl restart mc-server"
 
 Write-Host "Deployment complete!"

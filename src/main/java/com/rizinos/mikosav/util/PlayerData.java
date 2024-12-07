@@ -6,21 +6,22 @@ import org.bukkit.entity.Player;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 public class PlayerData {
     private final String username;
-    private final String[] permissions;
+    private final List<String> permissions;
     private final String welcomeMessage;
     private final String bannedReason;
-    private final long bannedUntil;
-    private long mutedUntil;
+    private final Long bannedUntil;
+    private Long mutedUntil;
     private Integer credit;
     private Location home;
     private Double onlineTime = 0.0;
     private Location deathLocation = null;
     private Player tpaTarget = null;
 
-    public PlayerData(String username, Integer credit, Location home, String welcomeMessage, String[] permissions, String bannedReason, long mutedUntil, Long bannedUntil) {
+    public PlayerData(String username, Integer credit, Location home, String welcomeMessage, List<String> permissions, String bannedReason, Long mutedUntil, Long bannedUntil) {
         this.username = username;
         this.credit = credit;
         this.home = home;
@@ -80,31 +81,35 @@ public class PlayerData {
         return welcomeMessage;
     }
 
-    public String[] getPermissions() {
+    public List<String> getPermissions() {
         return permissions;
     }
 
     public boolean isBanned() {
+        if (bannedUntil == null) return false;
         long currentTimeInSeconds = System.currentTimeMillis() / 1000;
         return bannedUntil >= currentTimeInSeconds;
     }
 
     public String getBannedMessage() {
+        if (bannedUntil == null) return "You are not banned.";
         String dateTime = LocalDateTime.ofEpochSecond(bannedUntil, 0, ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         return "You are banned until §c" + dateTime + "§r: " + bannedReason;
     }
 
     public boolean isMuted() {
+        if (mutedUntil == null) return false;
         long currentTimeInSeconds = System.currentTimeMillis() / 1000;
         return mutedUntil >= currentTimeInSeconds;
     }
 
     public String getMutedMessage() {
+        if (mutedUntil == null) return "You are not muted.";
         String dateTime = LocalDateTime.ofEpochSecond(mutedUntil, 0, ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        return "You are muted until §c" + dateTime;
+        return "You are muted until §c" + dateTime + "§r.";
     }
 
-    // TODO: Add a command for this
+    // TODO: Add a command for this and add API support
     public void muteFor(Integer minutes) {
         long currentTime = System.currentTimeMillis() / 1000;
         this.mutedUntil = currentTime + (minutes * 60);

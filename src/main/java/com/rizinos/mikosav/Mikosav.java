@@ -66,14 +66,16 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
     public boolean playerCanUse(Player player, List<String> restrict) {
         String uuid = player.getUniqueId().toString();
         boolean canUse = false;
+        boolean wasSet = false;
+
         for (String i : restrict) {
-            if (uuid == i) return true;
-            if (i.startsWith("!@")) {
-                if (player.hasPermission("mikosav." + i.substring(2))) return false;
-            } else if (i.startsWith("!")) {
-                if (uuid == i.substring(1)) return false;
-            } else if (i.startsWith("@")) {
-                if (player.hasPermission("mikosav." + i.substring(1))) canUse = true;
+            boolean isForbidden = i.startsWith("!");
+            if (isForbidden) i = i.substring(1);
+            if (!i.startsWith("@")) {
+                if (uuid == i) return !isForbidden;
+            } else if (player.hasPermission("mikosav." + i.substring(1)) && !wasSet) {
+                canUse = !isForbidden;
+                wasSet = true;
             }
         }
         return canUse;
@@ -81,17 +83,24 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
 
     public boolean canTeleport(Player player, World from, World to) {
         if (from == to) return true;
-        String res = api.worldTp(player.getUniqueId().toString(), from.getName(), to.getName());
-        if (res.equals("true")) return true;
-        if (res.equals("")) {
+        Map<String, Object> res = api.worldTp(player.getUniqueId().toString(), from.getName(), to.getName());
+        if (res.get("forbidden") != null) {
             say(player, "You have no access to this world.", 2);
             return false;
         }
-        if (!player.getInventory().isEmpty()) {
-            say(player, "You must clear your inventory before teleporting to that world.", 2);
-            return false;
+        if (res.get("gameMode") != null) {
+            player.setGameMode(GameMode.getByValue(((Double) res.get("gameMode")).intValue()));
         }
-        player.setGameMode(GameMode.getByValue(Integer.parseInt(res)));
+        if (res.get("inventory") == null) {
+            return true;
+        }
+        List<ItemStack> inventory = (List<ItemStack>) res.get("inventory");
+        if (inventory != null) {
+            api.saveInventory(player.getUniqueId().toString(), from.getName(), player.getInventory());
+            //player.getInventory().clear();
+            player.getInventory().setContents(inventory.toArray(new ItemStack[0]));
+            for (ItemStack item : inventory) if (item != null) player.getInventory().addItem(item);
+        }
         return true;
     }
 
@@ -101,6 +110,10 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
             return false;
         }
         PlayerData playerData = api.getPlayerData(player.getUniqueId().toString());
+        if (playerData == null) {
+            player.kick(text("§cYour Account is not linked with a RizinOS account. Please link it at " + api.domain));
+            return false;
+        }
         if (playerData.isBanned()) {
             player.kickPlayer(playerData.getBannedMessage());
             return false;
@@ -124,7 +137,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
         }
         for (Map.Entry<String, Boolean> entry : player.addAttachment(this).getPermissions().entrySet())
             player.addAttachment(this).unsetPermission(entry.getKey());
-        String[] permissions = playerData.getPermissions();
+        List<String> permissions = playerData.getPermissions();
         for (String permission : permissions) player.addAttachment(this).setPermission(permission, true);
 
         String[] roleList = {"admin", "moderator", "beta", "verified"};
@@ -166,15 +179,16 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
             api.online = false;
             getLogger().severe("Couldn't establish connection to RizinOS. Disabling player joins");
         }
-        Map<String, Map<String, Object>> rawWarps = (Map<String, Map<String, Object>>) config.get("warps");
-        rawWarps.forEach((warpName, warp) -> {
-            warps.put(warpName,
-                    new Warp(warpName, stringToLocation((String) warp.get("location")),
-                            Arrays.asList((String[]) warp.get("restrict"))));
+        Bukkit.getScheduler().runTask(this, () -> {
+            ((List<Map<String, Object>>) config.get("warps")).forEach((warp) -> {
+                warps.put((String) warp.get("name"),
+                        new Warp((String) warp.get("name"), stringToLocation((String) warp.get("location")),
+                                (List<String>) warp.get("restrict")));
+            });
         });
-        Map<String, Double> rawWorth = (Map<String, Double>) config.get("worth");
-        for (String i : rawWorth.keySet()) {
-            worth.put(i, rawWorth.get(i));
+        List<Map<String, Object>> rawWorth = (List<Map<String, Object>>) config.get("worth");
+        for (Map item : rawWorth) {
+            worth.put((String) item.get("name"), (Double) item.get("value"));
         }
         for (Player player : Bukkit.getOnlinePlayers()) initPlayer(player);
         Bukkit.getScheduler().runTaskTimer(this, () -> {
@@ -182,13 +196,14 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
             for (Player player : Bukkit.getOnlinePlayers()) {
                 playerUUIDs.add(player.getUniqueId().toString());
             }
-            Map<String, Double> credits = api.getCredit(playerUUIDs);
-            for (Player player : Bukkit.getOnlinePlayers()) {
+            if (playerUUIDs.isEmpty()) return;
+            for (Map<String, Object> credit : api.getCredit(playerUUIDs)) {
+                Player player = Bukkit.getPlayer(UUID.fromString((String) credit.get("uuid")));
+                if (player == null) continue;
                 Scoreboard scoreboard = player.getScoreboard();
                 Objective objective = scoreboard.getObjective(DisplaySlot.SIDEBAR);
                 PlayerData playerData = players.get(player);
-                // TODO: API call auslagern. Ein call für alle credits aller online Spieler
-                Integer newCredit = api.getCredit(player.getUniqueId().toString());
+                Integer newCredit = ((Double) credit.get("credit")).intValue();
                 if (!api.online || objective == null) {
                     player.kickPlayer(api.unavailable);
                     return;
@@ -672,6 +687,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                     say(player, "Invalid username", 2);
                     return false;
                 }
+                // TODO: At some point check if this gets stored in playerData as well
                 if (!target.hasPermission(args[1])) target.addAttachment(this).setPermission(args[1], true);
                 api.addPermission(target.getUniqueId().toString(), args[1]);
                 say(player, "User got permission", 0);
@@ -996,7 +1012,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
             case "warp":
                 if (args.length == 1) {
                     List<String> filteredWarps = warps.entrySet().stream()
-                            .filter(warp -> playerCanUse(player, warp.getValue().getRestrict()) && warp.getValue().getName().contains(args[1]))
+                            .filter(warp -> playerCanUse(player, warp.getValue().getRestrict()) && warp.getValue().getName().contains(args[0]))
                             .map(Map.Entry::getKey)
                             .collect(Collectors.toList());
                     if (filteredWarps.size() > 0) opt.addAll(filteredWarps);

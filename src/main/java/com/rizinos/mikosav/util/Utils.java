@@ -61,8 +61,7 @@ public class Utils {
     }
 
     public static Location stringToLocation(String locationString) {
-        String data = locationString.substring(locationString.indexOf('{') + 1, locationString.indexOf('}'));
-        String[] parts = data.split(",");
+        String[] parts = locationString.split(",");
         String worldName = null;
         double x = 0, y = 0, z = 0;
         float pitch = 0, yaw = 0;
