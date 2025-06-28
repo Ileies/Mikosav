@@ -17,7 +17,7 @@ public class PlayerData {
     private Long mutedUntil;
     private Integer credit;
     private Location home;
-    private Double onlineTime = 0.0;
+    private Double onlineTime = (Double) 0.0;
     private Location deathLocation = null;
     private Player tpaTarget = null;
 
@@ -112,6 +112,6 @@ public class PlayerData {
     // TODO: Add a command for this and add API support
     public void muteFor(Integer minutes) {
         long currentTime = System.currentTimeMillis() / 1000;
-        this.mutedUntil = currentTime + (minutes * 60);
+        this.mutedUntil = (Long) (currentTime + (minutes * 60));
     }
 }

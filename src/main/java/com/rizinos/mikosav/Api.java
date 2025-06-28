@@ -4,11 +4,10 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
-import com.rizinos.mikosav.util.IO;
-import com.rizinos.mikosav.util.PlayerData;
+import com.rizinos.mikosav.util.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.ItemStack;
 
 import java.lang.reflect.Type;
 import java.util.List;
@@ -16,7 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static com.rizinos.mikosav.util.InventoryUtils.itemsToJson;
+import static com.rizinos.mikosav.util.ItemSerialization.jsonToItems;
 import static com.rizinos.mikosav.util.Utils.locationToString;
 import static com.rizinos.mikosav.util.Utils.stringToLocation;
 
@@ -30,7 +29,7 @@ public class Api {
 
     public Api(String domain) {
         this.domain = domain;
-        this.apiAddress = "http://api." + domain + "/mc/";
+        this.apiAddress = "http://" + domain + "/api/mc/";
     }
 
     private String get(String endpoint) {
@@ -106,7 +105,7 @@ public class Api {
         if (playerData == null) return null;
 
         String username = (String) playerData.get("username");
-        Integer credit = ((Double) playerData.get("credit")).intValue();
+        int credit = ((Double) playerData.get("credit")).intValue();
         Location home = stringToLocation((String) playerData.get("home"));
         String welcomeMessage = (String) playerData.get("welcomeMessage");
         List<?> permissionsObj = (List<?>) playerData.get("permissions");
@@ -117,47 +116,46 @@ public class Api {
         String bannedReason = (String) playerData.get("bannedReason");
         Long mutedUntil = (Long) playerData.get("mutedUntil");
         Long bannedUntil = (Long) playerData.get("bannedUntil");
-        return new PlayerData(username, credit, home, welcomeMessage, permissions, bannedReason, mutedUntil, bannedUntil);
+        return new PlayerData(username, (Integer) credit, home, welcomeMessage, permissions, bannedReason, mutedUntil, bannedUntil);
     }
 
     public boolean setHome(String uuid, Location location) {
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("uuid", uuid);
-        jsonObject.addProperty("home", locationToString(location));
+        jsonObject.addProperty("homeLocation", locationToString(location));
         return Objects.equals(post("setHome", jsonObject), "true");
     }
 
-    public boolean setWarp(String warpName, Location location, List<String> restrict) {
+    public boolean setWarp(Warp warp) {
         JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("warp", warpName);
-        jsonObject.addProperty("location", locationToString(location));
+        jsonObject.addProperty("warpName", warp.getName());
+        jsonObject.addProperty("location", locationToString(warp.getLocation()));
         JsonArray jsonArray = new JsonArray();
-        for (String item : restrict) jsonArray.add(item);
+        for (String item : warp.getRestrict()) jsonArray.add(item);
         jsonObject.add("restrict", jsonArray);
         return Objects.equals(post("setWarp", jsonObject), "true");
     }
 
     public boolean deleteWarp(String warpName) {
         JsonObject jsonObject = new JsonObject();
-        jsonObject.addProperty("warp", warpName);
+        jsonObject.addProperty("warpName", warpName);
         return Objects.equals(post("setWarp", jsonObject), "true");
     }
 
-    public void saveInventory(String uuid, String worldName, PlayerInventory inventory) {
+    public void saveInventory(String uuid, String worldName, ItemStack[] items) {
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("world", worldName);
         jsonObject.addProperty("uuid", uuid);
-        jsonObject.addProperty("inventory", gson.toJson(itemsToJson(inventory.getContents())));
-        post("saveInventory", itemsToJson(inventory.getContents()));
+        jsonObject.addProperty("inventory", ItemSerialization.itemsToJson(items));
+        post("saveInventory", jsonObject);
     }
 
-    public PlayerInventory loadInventory(String uuid, String worldName) {
+    public ItemStack[] loadInventory(String uuid, String worldName) {
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("uuid", uuid);
-        jsonObject.addProperty("worldName", worldName);
-        String data = post("loadInventory", jsonObject);
-        return gson.fromJson(data, PlayerInventory.class);
-        //return createInv(jsonToItems(data));
+        jsonObject.addProperty("world", worldName);
+        String response = post("loadInventory", jsonObject);
+        return jsonToItems(response);
     }
 
     public void addPermission(String uuid, String permission) {
@@ -178,16 +176,16 @@ public class Api {
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("from", from);
         jsonObject.addProperty("to", to);
-        jsonObject.addProperty("amount", amount);
+        jsonObject.addProperty("amount", (Integer) amount);
         return Objects.equals(post("pay", jsonObject), "true");
     }
 
-    public Map<String, Object> worldTp(String uuid, String from, String to) {
+    public Map<String, Object> worldTp(String uuid, String from, String to, Boolean isOp) {
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("uuid", uuid);
         jsonObject.addProperty("from", from);
         jsonObject.addProperty("to", to);
-
+        jsonObject.addProperty("op", isOp);
         String data = post("canTp", jsonObject);
         Type type = new TypeToken<Map<String, Object>>() {
         }.getType();

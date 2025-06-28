@@ -57,10 +57,11 @@ public class Utils {
 
     public static String locationToString(Location location) {
         String loc = location.toString();
-        return loc.substring(9, loc.length() - 1);
+        return loc.substring(9, loc.length() - 1).replace("CraftWorld{name=", "").replace("}", "");
     }
 
     public static Location stringToLocation(String locationString) {
+        if (locationString == null) return null;
         String[] parts = locationString.split(",");
         String worldName = null;
         double x = 0, y = 0, z = 0;

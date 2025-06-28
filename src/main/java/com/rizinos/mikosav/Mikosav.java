@@ -1,5 +1,6 @@
 package com.rizinos.mikosav;
 
+import com.google.gson.Gson;
 import com.rizinos.mikosav.util.IO;
 import com.rizinos.mikosav.util.PlayerData;
 import com.rizinos.mikosav.util.Skipper;
@@ -39,6 +40,8 @@ import org.bukkit.scoreboard.Scoreboard;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.rizinos.mikosav.util.InventoryUtils.createInv;
+import static com.rizinos.mikosav.util.ItemSerialization.jsonToItems;
 import static com.rizinos.mikosav.util.Utils.*;
 import static java.util.Map.entry;
 import static net.kyori.adventure.text.Component.text;
@@ -60,9 +63,6 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
     private final Api api = new Api("rizinos.com");
     private final Skipper skipper = new Skipper();
 
-    // TODO: Ideally, PlayerData shouldn't save the player's permissions. They are applied to the player and then
-    //  it's done.
-
     public boolean playerCanUse(Player player, List<String> restrict) {
         String uuid = player.getUniqueId().toString();
         boolean canUse = false;
@@ -83,7 +83,10 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
 
     public boolean canTeleport(Player player, World from, World to) {
         if (from == to) return true;
-        Map<String, Object> res = api.worldTp(player.getUniqueId().toString(), from.getName(), to.getName());
+        Map<String, Object> res = api.worldTp(player.getUniqueId().toString(), from.getName(), to.getName(), (Boolean) player.isOp());
+        if (res == null) {
+            return true;
+        }
         if (res.get("forbidden") != null) {
             say(player, "You have no access to this world.", 2);
             return false;
@@ -91,15 +94,9 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
         if (res.get("gameMode") != null) {
             player.setGameMode(GameMode.getByValue(((Double) res.get("gameMode")).intValue()));
         }
-        if (res.get("inventory") == null) {
-            return true;
-        }
-        List<ItemStack> inventory = (List<ItemStack>) res.get("inventory");
-        if (inventory != null) {
-            api.saveInventory(player.getUniqueId().toString(), from.getName(), player.getInventory());
-            //player.getInventory().clear();
-            player.getInventory().setContents(inventory.toArray(new ItemStack[0]));
-            for (ItemStack item : inventory) if (item != null) player.getInventory().addItem(item);
+        if (res.get("inventory") != null) {
+            api.saveInventory(player.getUniqueId().toString(), from.getName(), player.getInventory().getContents());
+            player.getInventory().setContents(jsonToItems(new Gson().toJson(res.get("inventory"))));
         }
         return true;
     }
@@ -130,9 +127,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
         objective.getScore("§8------------").setScore(0);
         player.setScoreboard(scoreboard);
         if (playerData.getUsername() == null) {
-            player.kickPlayer("You are not whitelisted. Add yourself to the " +
-                    "whitelist " +
-                    "at " + api.domain + "/whitelist");
+            player.kickPlayer("You are not whitelisted. Add yourself to the whitelist at " + api.domain + "/whitelist");
             return false;
         }
         for (Map.Entry<String, Boolean> entry : player.addAttachment(this).getPermissions().entrySet())
@@ -140,12 +135,11 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
         List<String> permissions = playerData.getPermissions();
         for (String permission : permissions) player.addAttachment(this).setPermission(permission, true);
 
-        String[] roleList = {"admin", "moderator", "beta", "verified"};
+        String[] roleList = {"user", "beta", "moderator", "admin"};
         String hR = "guest";
         for (String role : roleList) {
             if (player.hasPermission("mikosav." + role)) {
                 hR = role;
-                break;
             }
         }
 
@@ -153,7 +147,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 entry("admin", "§4§lAdmin%s§c"),
                 entry("moderator", "§5§lMod%s§3"),
                 entry("beta", "§2Beta%s§e"),
-                entry("verified", "§8Gamer%s§7"),
+                entry("user", "§8Gamer%s§7"),
                 entry("guest", "§8Guest%s§7")
         ).get(hR), " §r§l¦§r ") + playerData.getUsername() + "§r";
         player.setPlayerListName(displayName);
@@ -161,6 +155,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
         player.updateCommands();
         player.setDisplayName(displayName);
         players.put(player, playerData);
+
         /*PlayerProfile pp = player.getPlayerProfile();
         pp.setName(username);
         player.setPlayerProfile(pp);*/
@@ -197,13 +192,15 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 playerUUIDs.add(player.getUniqueId().toString());
             }
             if (playerUUIDs.isEmpty()) return;
-            for (Map<String, Object> credit : api.getCredit(playerUUIDs)) {
+            List<Map<String, Object>> credits = api.getCredit(playerUUIDs);
+            if (credits == null) return;
+            for (Map<String, Object> credit : credits) {
                 Player player = Bukkit.getPlayer(UUID.fromString((String) credit.get("uuid")));
                 if (player == null) continue;
                 Scoreboard scoreboard = player.getScoreboard();
                 Objective objective = scoreboard.getObjective(DisplaySlot.SIDEBAR);
                 PlayerData playerData = players.get(player);
-                Integer newCredit = ((Double) credit.get("credit")).intValue();
+                Integer newCredit = (Integer) ((Double) credit.get("credit")).intValue();
                 if (!api.online || objective == null) {
                     player.kickPlayer(api.unavailable);
                     return;
@@ -221,7 +218,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 if (newOT != oldOT) {
                     scoreboard.resetScores("§e" + oldOT);
                     objective.getScore("§e" + newOT).setScore(1);
-                    playerData.setOnlineTime(newOT);
+                    playerData.setOnlineTime((Double) newOT);
                 }
             }
         }, 0, 20 * 15);
@@ -245,6 +242,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        api.saveInventory(player.getUniqueId().toString(), player.getWorld().getName(), player.getInventory().getContents());
         players.remove(player);
         event.setQuitMessage(player.getDisplayName() + "§7 just went offline.");
     }
@@ -253,8 +251,14 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player player = event.getEntity().getPlayer();
         if (player == null) return;
+        if(!event.getKeepInventory()) {
+            api.saveInventory(player.getUniqueId().toString(), player.getWorld().getName(), event.getItemsToKeep().toArray(new ItemStack[0]));
+        }
         players.get(player).setDeathLocation(player.getLocation());
-        Bukkit.getScheduler().runTaskLater(this, () -> players.get(player).setDeathLocation(null), 15 * 1000 * 20);
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            PlayerData playerData = players.get(player);
+            if (playerData != null) playerData.setDeathLocation(null);
+        }, 15 * 1000 * 20);
         skipper.playerDeath(event);
     }
 
@@ -399,8 +403,9 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
 
     @EventHandler
     public void onServerListPing(ServerListPingEvent event) {
-        if (!api.online)
+        if (!api.online) {
             event.setMotd("RizinOS Network §6(Java & Bedrock) §c[1.7-1.19]\n§4Service unreachable. Contact §dIleies");
+        }
     }
 
     @EventHandler
@@ -588,7 +593,9 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 }
                 return true;
             case "heal":
-                if (args.length > 0) {
+                if (args.length == 0) {
+                    target = player;
+                } else {
                     if (!player.hasPermission("mikosav.command.healall")) {
                         say(player, "You're not allowed to do that!", 2);
                         return false;
@@ -598,15 +605,11 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                         say(player, "Invalid username", 2);
                         return false;
                     }
-                    target.setHealth(20D);
-                    target.setFoodLevel(40);
                     say(player, target.getDisplayName() + " was healed!", 0);
-                    return true;
                 }
-                player.getTotalExperience();
-                player.setHealth(20D);
-                player.setFoodLevel(40);
-                say(player, "You have been healed!", 0);
+                target.setHealth(20D);
+                target.setFoodLevel(40);
+                say(target, "You have been healed!", 0);
                 return true;
             case "hideplayer":
                 if (args.length == 0) return false;
@@ -649,15 +652,30 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 say(player, "The player was shown", 0);
                 break;
             case "flyspeed":
-            case "fs":
                 if (args.length == 0) return false;
-                float fs = Float.parseFloat(args[0]);
+                float fs;
+                if (args.length == 1) {
+                    target = player;
+                    fs = Float.parseFloat(args[0]);
+                } else {
+                    if (!player.hasPermission("mikosav.command.flyspeedall")) {
+                        say(player, "You're not allowed to do that!", 2);
+                        return false;
+                    }
+                    target = getPlayer(args[0]);
+                    if (target == null) {
+                        say(player, "Invalid username", 2);
+                        return false;
+                    }
+                    fs = Float.parseFloat(args[1]);
+                }
                 if (fs < 1 || fs > 10) {
                     say(player, "The flyspeed must be between 1 and 10", 2);
                     return false;
                 }
-                player.setFlySpeed(fs / 10);
-                say(player, "Your flyspeed is now " + fs, 0);
+                target.setFlySpeed(fs / 10);
+                if (args.length > 1) say(player, target.getDisplayName() + "'s flyspeed is now " + fs, 0);
+                say(target, "Your flyspeed is now " + fs, 0);
                 break;
             case "perms":
                 target = getPlayer(args[0]);
@@ -705,11 +723,12 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                     return true;
                 }
                 if (args[0].equals("load")) {
-                    player.openInventory(api.loadInventory(uuid, player.getWorld().getName()));
+                    // TODO: Let me see all player's inventories, hehe
+                    player.openInventory(createInv(api.loadInventory(uuid, player.getWorld().getName())));
                     return true;
                 }
                 if (args[0].equals("save")) {
-                    api.saveInventory(uuid, player.getWorld().getName(), player.getInventory());
+                    api.saveInventory(uuid, player.getWorld().getName(), player.getInventory().getContents());
                     say(player, "Done!", 1);
                     return true;
                 }
@@ -804,7 +823,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                         return false;
                     }
                     if (players.get(target).getTpa() != player) {
-                        say(player, "This player didn't send you a TP request!", 2);
+                        say(player, "This TP request expired.", 2);
                         return false;
                     }
                     if (target.teleport(player)) players.get(target).setTpa(null);
@@ -840,20 +859,28 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 break;
             case "speed":
                 if (args.length == 0) return false;
-                if (args.length > 1) {
+                float speed;
+                if (args.length == 1) {
+                    target = player;
+                    speed = Float.parseFloat(args[0]);
+                } else {
                     if (!player.hasPermission("mikosav.command.speedall")) {
                         say(player, "You're not allowed to do that!", 2);
                         return false;
                     }
                     target = getPlayer(args[0]);
-                    args[0] = args[1];
-                } else target = player;
-                float speed = Float.parseFloat(args[0]);
+                    if (target == null) {
+                        say(player, "Invalid username", 2);
+                        return false;
+                    }
+                    speed = Float.parseFloat(args[1]);
+                }
                 if (speed < 1 || speed > 10) {
                     say(player, "The speed must be between 1 and 10", 2);
                     return false;
                 }
                 player.setWalkSpeed(speed / 10);
+                if (args.length > 1) say(player, target.getDisplayName() + "'s speed is now " + speed, 0);
                 say(target, "Your speed is now " + speed, 0);
                 break;
             case "warp":
@@ -867,17 +894,20 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 break;
             case "setwarp":
                 if (args.length < 1) return false;
-                List<String> restrict = null;
-                if (args.length > 1) {
+                String warpName = args[0].toLowerCase();
+                List<String> restrict = new ArrayList<>();
+                if (args.length == 1) {
+                    if (warps.get(warpName) != null) {
+                        restrict = warps.get(warpName).getRestrict();
+                    } else {
+                        restrict.add("@user");
+                    }
+                } else {
                     Collections.addAll(restrict, args[1].toLowerCase().split(","));
                 }
-                boolean done;
-                // warps.get(...)    ...   warp.update(location, restrict)
-                if (warps.get(args[0].toLowerCase()) == null)
-                    done = api.setWarp(args[0].toLowerCase(), player.getLocation(),
-                            restrict);
-                else done = api.setWarp(args[0].toLowerCase(), player.getLocation(), restrict);
-                if (done) say(player, "Warp point was set", 0);
+                Warp newWarp = new Warp(warpName, player.getLocation(), restrict);
+                warps.put(args[0].toLowerCase(), newWarp);
+                if (api.setWarp(newWarp)) say(player, "Warp point was set", 0);
                 else say(player, "There was an error whilst trying to set warp point.", 2);
                 break;
             case "delwarp":
@@ -921,11 +951,11 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 say(player, msg, 1);
                 break;
             case "ec":
+                if (!canTeleport(player, getWorld(spawnWorld), player.getWorld())) {
+                    say(player, "You cannot do this in this world.", 2);
+                    return true;
+                }
                 if (args.length == 0) {
-                    if (!canTeleport(player, getWorld(spawnWorld), player.getWorld())) {
-                        say(player, "You cannot do this in this world.", 2);
-                        return true;
-                    }
                     player.openInventory(player.getEnderChest());
                     return true;
                 }
@@ -934,6 +964,12 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                     return false;
                 }
                 if (getPlayer(args[0]) == null) {
+                    OfflinePlayer offlineTarget = Bukkit.getOfflinePlayer(args[0]);
+                    if (!offlineTarget.hasPlayedBefore()) {
+                        say(player, "Player has never joined before.", 2);
+                        return true;
+                    }
+
                     say(player, "This player is offline.", 2);
                     return true;
                 }
@@ -996,9 +1032,12 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
         switch (cmd.getName().toLowerCase()) {
             case "balance":
             case "pay":
-                if (args.length == 1) for (OfflinePlayer p : getOfflinePlayers()) opt.add(p.getName());
+                if (args.length == 1) for (OfflinePlayer p : getOfflinePlayers()) {
+                    if(p.getName().toLowerCase().contains(args[0].toLowerCase())) opt.add(p.getName());
+                }
                 break;
             case "fly":
+            case "speed":
             case "flyspeed":
             case "heal":
             case "hideplayer":
@@ -1006,13 +1045,20 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
             case "tpa":
             case "giveperm":
             case "removeperm":
-                if (args.length == 1) for (Player p : getOnlinePlayers()) opt.add(p.getName());
+                if (args.length == 1) for (Player p : getOnlinePlayers()) {
+                    if(p.getName().toLowerCase().contains(args[0].toLowerCase())) opt.add(p.getName());
+                }
+                if (args.length == 2 && cmd.getName().toLowerCase().contains("perm")) {
+                    for (String p : players.get(player).getPermissions()) {
+                        if (p.toLowerCase().contains(args[1].toLowerCase())) opt.add(p);
+                    }
+                }
                 break;
             case "delwarp":
             case "warp":
                 if (args.length == 1) {
                     List<String> filteredWarps = warps.entrySet().stream()
-                            .filter(warp -> playerCanUse(player, warp.getValue().getRestrict()) && warp.getValue().getName().contains(args[0]))
+                            .filter(warp -> playerCanUse(player, warp.getValue().getRestrict()) && warp.getValue().getName().toLowerCase().contains(args[0].toLowerCase()))
                             .map(Map.Entry::getKey)
                             .collect(Collectors.toList());
                     if (filteredWarps.size() > 0) opt.addAll(filteredWarps);
@@ -1025,17 +1071,15 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 opt.add("off");
                 break;
             case "wtp":
-                for (World w : getWorlds()) opt.add(w.getName());
+                if (args.length == 1) for (World w : getWorlds()) {
+                    if(w.getName().toLowerCase().contains(args[0].toLowerCase())) opt.add(w.getName());
+                }
                 break;
         }
         return opt;
     }
 }
 /*
-public void saveInventory(Player player, Inventory inv) {
-		inventories.put(player, inv);
-}
-
 public boolean hasAmount(Material material, Inventory inventory, int amount){
 	int inventory_amount = 0;
 	for(ItemStack i : inventory) if(i.getType() == material) inventory_amount = inventory_amount + i.getAmount();
@@ -1055,15 +1099,4 @@ public static int removeItems(Inventory inventory, Material material, int amount
 	for(ItemStack item: retVal.values()) notRemoved+=item.getAmount();
 	return notRemoved;
 }
-
-Inventory mikosav_inventory = Bukkit.getServer().createInventory(player, 9, "Mikosav inventory"); Material m = Material.matchMaterial(args[1]);
-
-public static String[] getAllPlayerNames() {
-  TreeSet<String> playerNames=new TreeSet<String>();
-  OfflinePlayer[] players=Bukkit.getServer().getOfflinePlayers();
-  for (OfflinePlayer player : players)   playerNames.add(player.getName().toLowerCase());
-  return playerNames.toArray(new String[playerNames.size()]);
-}
-
-
 */
