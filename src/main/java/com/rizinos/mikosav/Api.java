@@ -193,8 +193,14 @@ public class Api {
     }
 
     // TODO: Repair and use this:
-    public void banPlayer(String uuid, Integer minutes, String to) {
+    public Integer banPlayer(String uuid, Integer minutes, String reason) {
         long currentTime = System.currentTimeMillis() / 1000;
         long bannedUntil = currentTime + (minutes * 60L);
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("uuid", uuid);
+        jsonObject.addProperty("bannedUntil", bannedUntil);
+        jsonObject.addProperty("reason", reason);
+        String data = post("banPlayer", jsonObject);
+        return gson.fromJson(data, Integer.class);
     }
 }
