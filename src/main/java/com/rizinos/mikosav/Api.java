@@ -4,7 +4,10 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
-import com.rizinos.mikosav.util.*;
+import com.rizinos.mikosav.util.IO;
+import com.rizinos.mikosav.util.ItemSerialization;
+import com.rizinos.mikosav.util.PlayerData;
+import com.rizinos.mikosav.util.Warp;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.inventory.ItemStack;
@@ -22,15 +25,11 @@ import static com.rizinos.mikosav.util.Utils.stringToLocation;
 public class Api {
     // TODO: Check everywhere if the playerData is saved appropriately. (rewritten to players.replace)
     boolean online = true;
-    String domain;
-    String apiAddress;
+    String apiAddress = "http://localhost/api/mc/";
     String unavailable = "There was a problem with our Webservice. Please contact Ileies";
     Gson gson = new Gson();
-
-    public Api(String domain) {
-        this.domain = domain;
-        this.apiAddress = "http://" + domain + "/api/mc/";
-    }
+    Type mapType = new TypeToken<Map<String, Object>>() {
+    }.getType();
 
     private String get(String endpoint) {
         if (!online) return null;
@@ -116,7 +115,7 @@ public class Api {
         String bannedReason = (String) playerData.get("bannedReason");
         Long mutedUntil = (Long) playerData.get("mutedUntil");
         Long bannedUntil = (Long) playerData.get("bannedUntil");
-        return new PlayerData(username, (Integer) credit, home, welcomeMessage, permissions, bannedReason, mutedUntil, bannedUntil);
+        return new PlayerData(username, credit, home, welcomeMessage, permissions, bannedReason, mutedUntil, bannedUntil);
     }
 
     public boolean setHome(String uuid, Location location) {
@@ -176,7 +175,7 @@ public class Api {
         JsonObject jsonObject = new JsonObject();
         jsonObject.addProperty("from", from);
         jsonObject.addProperty("to", to);
-        jsonObject.addProperty("amount", (Integer) amount);
+        jsonObject.addProperty("amount", amount);
         return Objects.equals(post("pay", jsonObject), "true");
     }
 

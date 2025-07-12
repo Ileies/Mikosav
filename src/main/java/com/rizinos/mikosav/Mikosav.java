@@ -54,13 +54,14 @@ import static org.bukkit.Bukkit.*;
  * */
 
 public final class Mikosav extends JavaPlugin implements Listener, TabCompleter {
+    private final String domain = "rizinos.com";
     private final Map<Player, PlayerData> players = new HashMap<>();
     private final Map<String, Double> worth = new HashMap<>();
     private final Map<String, Warp> warps = new HashMap<>();
     private final String spawnWorld = "spawn";
     private final String[] enchs = {"power", "flame", "infinity", "punch", "binding_curse", "channeling", "sharpness",
             "bane_of_arthropods", "smite", "depth_strider", "efficiency", "feather_falling", "protection", "fire_protection", "projectile_protection", "blast_protection", "unbreaking", "fire_aspect", "frost_walker", "impaling", "knockback", "fortune", "looting", "loyalty", "luck_of_the_sea", "lure", "mending", "multishot", "respiration", "piercing", "quick_charge", "riptide", "silk_touch", "sweeping", "thorns", "vanishing_curse", "aqua_affinity"};
-    private final Api api = new Api("rizinos.com");
+    private final Api api = new Api();
     private final Skipper skipper = new Skipper();
 
     public boolean playerCanUse(Player player, List<String> restrict) {
@@ -83,7 +84,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
 
     public boolean canTeleport(Player player, World from, World to) {
         if (from == to) return true;
-        Map<String, Object> res = api.worldTp(player.getUniqueId().toString(), from.getName(), to.getName(), (Boolean) player.isOp());
+        Map<String, Object> res = api.worldTp(player.getUniqueId().toString(), from.getName(), to.getName(), player.isOp());
         if (res == null) {
             return true;
         }
@@ -108,7 +109,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
         }
         PlayerData playerData = api.getPlayerData(player.getUniqueId().toString());
         if (playerData == null) {
-            player.kick(text("§cYour Account is not linked with a RizinOS account. Please link it at " + api.domain));
+            player.kick(text("§cYour Account is not linked with a RizinOS account. Please link it at " + domain));
             return false;
         }
         if (playerData.isBanned()) {
@@ -127,7 +128,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
         objective.getScore("§8------------").setScore(0);
         player.setScoreboard(scoreboard);
         if (playerData.getUsername() == null) {
-            player.kickPlayer("You are not whitelisted. Add yourself to the whitelist at " + api.domain + "/whitelist");
+            player.kickPlayer("You are not whitelisted. Add yourself to the whitelist at " + domain + "/whitelist");
             return false;
         }
         for (Map.Entry<String, Boolean> entry : player.addAttachment(this).getPermissions().entrySet())
@@ -200,7 +201,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 Scoreboard scoreboard = player.getScoreboard();
                 Objective objective = scoreboard.getObjective(DisplaySlot.SIDEBAR);
                 PlayerData playerData = players.get(player);
-                Integer newCredit = (Integer) ((Double) credit.get("credit")).intValue();
+                Integer newCredit = ((Double) credit.get("credit")).intValue();
                 if (!api.online || objective == null) {
                     player.kickPlayer(api.unavailable);
                     return;
@@ -218,7 +219,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
                 if (newOT != oldOT) {
                     scoreboard.resetScores("§e" + oldOT);
                     objective.getScore("§e" + newOT).setScore(1);
-                    playerData.setOnlineTime((Double) newOT);
+                    playerData.setOnlineTime(newOT);
                 }
             }
         }, 0, 20 * 15);
@@ -737,7 +738,7 @@ public final class Mikosav extends JavaPlugin implements Listener, TabCompleter 
             case "ms":
                 if (args.length == 0) return false;
                 if (!player.isOp()) {
-                    say(player, "You need admin rights on " + api.domain, 2);
+                    say(player, "You need admin rights on " + domain, 2);
                     return false;
                 }
                 String[] x = new String[args.length - 1];
